@@ -25,7 +25,7 @@ export class VideoService implements OnModuleInit {
     kling: KlingProvider,
     seedance: SeedanceProvider,
   ) {
-    this.providers = new Map([
+    this.providers = new Map<string, VideoProvider>([
       ['veo', veo],
       ['runway', runway],
       ['kling', kling],
