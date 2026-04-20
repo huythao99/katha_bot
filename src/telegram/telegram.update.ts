@@ -239,12 +239,19 @@ export class TelegramUpdate implements OnModuleInit {
   private async sendVideo(job: VideoJob) {
     try {
       await this.bot.telegram.sendMessage(job.chatId, 'Your video is ready! Sending now...');
-      await this.bot.telegram.sendVideo(job.chatId, { source: job.outputPath });
+
+      const isUrl = job.outputPath.startsWith('http://') || job.outputPath.startsWith('https://');
+
+      if (isUrl) {
+        await this.bot.telegram.sendVideo(job.chatId, job.outputPath);
+      } else {
+        await this.bot.telegram.sendVideo(job.chatId, { source: job.outputPath });
+      }
     } catch (err) {
       this.logger.error(`Failed to send video for job ${job.id}: ${err.message}`);
       await this.bot.telegram.sendMessage(
         job.chatId,
-        `Video generated but could not be sent directly.\nPath: ${job.outputPath}\nError: ${err.message}`,
+        `Video generated but could not be sent directly.\nURL: ${job.outputPath}\nError: ${err.message}`,
       );
     }
   }

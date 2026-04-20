@@ -98,12 +98,14 @@ export class VideoService implements OnModuleInit {
         prompt: this.buildPromptFromProduct(product),
         imageUrl: product.images[0],
         quality: job.input.quality,
+        durationSeconds: Number(this.config.get('VIDEO_DURATION_SECONDS', 5)),
       };
     } else {
       options = {
         prompt: job.input.prompt,
         imageUrl: job.input.imageUrl,
         quality: job.input.quality,
+        durationSeconds: Number(this.config.get('VIDEO_DURATION_SECONDS', 5)),
       };
     }
 
