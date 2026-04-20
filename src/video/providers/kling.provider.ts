@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHmac } from 'crypto';
 import { VideoProvider, VideoGenerateOptions, VideoGenerateResult } from './video-provider.interface';
 
 /**
@@ -15,8 +16,27 @@ export class KlingProvider implements VideoProvider {
 
   constructor(private config: ConfigService) {}
 
+  private generateJwt(): string {
+    const accessKey = this.config.get('KLING_ACCESS_KEY');
+    const secretKey = this.config.get('KLING_SECRET_KEY');
+
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const now = Math.floor(Date.now() / 1000);
+    const payload = Buffer.from(JSON.stringify({
+      iss: accessKey,
+      exp: now + 1800,
+      nbf: now - 5,
+    })).toString('base64url');
+
+    const signature = createHmac('sha256', secretKey)
+      .update(`${header}.${payload}`)
+      .digest('base64url');
+
+    return `${header}.${payload}.${signature}`;
+  }
+
   async generateVideo(options: VideoGenerateOptions): Promise<VideoGenerateResult> {
-    const apiKey = this.config.get('KLING_API_KEY');
+    const apiKey = this.generateJwt();
     const duration = options.durationSeconds ?? 5; // Kling supports 5 or 10s
 
     const endpoint = options.imageUrl
@@ -60,7 +80,7 @@ export class KlingProvider implements VideoProvider {
     return { videoPath, durationSeconds: duration };
   }
 
-  private async pollTask(taskId: string, apiKey: string, type: string): Promise<string> {
+  private async pollTask(taskId: string, _apiKey: string, type: string): Promise<string> {
     const pollUrl = `${this.baseUrl}/videos/${type}/${taskId}`;
     const maxAttempts = 60;
 
@@ -68,7 +88,7 @@ export class KlingProvider implements VideoProvider {
       await this.sleep(10_000);
 
       const res = await fetch(pollUrl, {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
+        headers: { 'Authorization': `Bearer ${this.generateJwt()}` },
       });
 
       if (!res.ok) throw new Error(`[Kling] Poll failed: ${res.status}`);

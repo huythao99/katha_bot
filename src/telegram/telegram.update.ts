@@ -252,8 +252,7 @@ export class TelegramUpdate implements OnModuleInit {
   private async sendError(job: VideoJob) {
     await this.bot.telegram.sendMessage(
       job.chatId,
-      `Video generation failed for job \`${job.id}\`\n\nError: ${job.error}`,
-      { parse_mode: 'Markdown' },
+      `Video generation failed for job ${job.id}\n\nError: ${job.error}`,
     );
   }
 }
