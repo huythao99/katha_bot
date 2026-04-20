@@ -23,7 +23,7 @@ export class VeoProvider implements VideoProvider {
       model: 'veo-3.0-generate-preview',
       prompt: options.prompt,
       ...(options.imageUrl
-        ? { image: { gcsUri: options.imageUrl, mimeType: 'image/jpeg' } }
+        ? { image: { imageBytes: await this.fetchImageAsBase64(options.imageUrl), mimeType: 'image/jpeg' } }
         : {}),
       config: {
         aspectRatio: '16:9',
@@ -52,6 +52,13 @@ export class VeoProvider implements VideoProvider {
     }
 
     throw new Error('[Veo] Timed out after 10 minutes');
+  }
+
+  private async fetchImageAsBase64(url: string): Promise<string> {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`[Veo] Failed to fetch image: ${res.status}`);
+    const buffer = await res.arrayBuffer();
+    return Buffer.from(buffer).toString('base64');
   }
 
   private sleep(ms: number) {
