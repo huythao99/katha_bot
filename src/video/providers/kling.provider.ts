@@ -12,7 +12,7 @@ export class KlingProvider implements VideoProvider {
   readonly name = 'kling';
   readonly displayName = 'Kling AI';
   private readonly logger = new Logger(KlingProvider.name);
-  private readonly baseUrl = 'https://api.klingai.com/v1';
+  private readonly baseUrl = 'https://api-singapore.klingai.com/v1';
 
   constructor(private config: ConfigService) {}
 
