@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { TelegramUpdate } from './telegram.update';
 import { VideoModule } from '../video/video.module';
+import { TiktokModule } from '../tiktok/tiktok.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { VideoModule } from '../video/video.module';
       }),
     }),
     VideoModule,
+    TiktokModule,
   ],
   providers: [TelegramUpdate],
 })
