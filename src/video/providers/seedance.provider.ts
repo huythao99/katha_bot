@@ -12,7 +12,7 @@ export class SeedanceProvider implements VideoProvider {
   readonly name = 'seedance';
   readonly displayName = 'Seedance 2.0';
   private readonly logger = new Logger(SeedanceProvider.name);
-  private readonly baseUrl = 'https://ark.cn-beijing.volces.com/api/v3';
+  private readonly baseUrl = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 
   constructor(private config: ConfigService) {}
 
