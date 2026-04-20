@@ -115,11 +115,15 @@ export class VideoService implements OnModuleInit {
 
   private buildPromptFromProduct(product: { title: string; description: string; price: string }): string {
     return [
-      `Create a high-quality product showcase video.`,
+      `A lively and energetic product advertisement video.`,
       `Product: ${product.title}.`,
       product.description ? `Details: ${product.description}.` : '',
-      product.price ? `Price: ${product.price}.` : '',
-      `Style: cinematic, professional lighting, smooth transitions, suitable for e-commerce advertising.`,
+      `Show a real person actively using this product in daily life.`,
+      `Include close-up shots of the product details, a happy person interacting with it naturally,`,
+      `and dynamic lifestyle scenes that highlight its key benefits.`,
+      `Style: vibrant colors, smooth cinematic motion, upbeat energy, professional lighting,`,
+      `suitable for TikTok and social media e-commerce advertising.`,
+      product.price ? `Price tag shown: ${product.price}.` : '',
     ].filter(Boolean).join(' ');
   }
 }
