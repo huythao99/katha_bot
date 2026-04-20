@@ -1,0 +1,24 @@
+# Environment - NEVER commit this
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Temp video files
+tmp/
+
+# Google credentials
+*.json
+gcp-credentials.json
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
