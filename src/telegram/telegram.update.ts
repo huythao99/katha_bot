@@ -1,10 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectBot, Start, Help, Command, On, Action, Ctx } from 'nestjs-telegraf';
+import { InjectBot, Start, Help, Command, On, Action, Ctx, Update } from 'nestjs-telegraf';
 import { Telegraf, Context, Markup } from 'telegraf';
 import { TiktokService } from '../tiktok/tiktok.service';
 import { VideoService } from '../video/video.service';
 import { VideoJob } from '../queue/queue.service';
 
+@Update()
 @Injectable()
 export class TelegramUpdate implements OnModuleInit {
   private readonly logger = new Logger(TelegramUpdate.name);
