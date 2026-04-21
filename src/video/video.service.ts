@@ -75,7 +75,7 @@ export class VideoService implements OnModuleInit {
     const detail = this.extractProductDetail(product.title, product.description);
 
     const sharedNegative = [
-      'face, head, portrait',
+      'face, human face, eyes, nose, mouth, chin, forehead, portrait, selfie',
       'wrong product, different product, inconsistent design, color mismatch',
       'blurry, low quality, distorted, deformed',
       'text overlay, watermark, subtitle',
@@ -84,46 +84,49 @@ export class VideoService implements OnModuleInit {
 
     return [
       {
-        // Clip 1 (5s): product hero shot — no person
+        // Clip 1 (5s): product hero shot — no person, rich product showcase
         duration: 5,
         cfgScale: 0.7,
         negativePrompt: ['person, human, hands, body', sharedNegative].join(', '),
         prompt: [
-          // 1. Subject — product name + visual parameters
-          `Product: ${detail.name}.`,
-          detail.visual ? `Appearance: ${detail.visual}.` : '',
-          // 2. Action
-          `The product slowly rotates in place to reveal all sides, surface texture, and design details.`,
+          // 1. Subject — full product identity
+          `Advertisement product showcase: ${detail.name}.`,
+          detail.visual ? `Visual appearance: ${detail.visual}.` : '',
+          detail.sellingPoints ? `Key features: ${detail.sellingPoints}.` : '',
+          // 2. Action — reveal design details
+          `The product slowly rotates in place revealing all sides, surface texture, stitching, logo, and design details up close.`,
           // 3. Environment
-          `Placed on a clean minimal surface, soft studio lighting from above and sides, neutral background.`,
-          // 4. Style — application context + key details
+          `Placed on a clean minimal surface, soft studio lighting from above and sides creating gentle highlights that emphasize product quality, neutral background.`,
+          // 4. Style — product purpose and what to highlight
           detail.application ? `Product purpose: ${detail.application}.` : '',
-          detail.details ? `Key details to show: ${detail.details}.` : '',
-          `Cinematic depth of field, vivid accurate colors, some frames slightly stylized for visual impact.`,
+          detail.details ? `Highlight these product details: ${detail.details}.` : '',
+          `Cinematic depth of field, vivid accurate product colors, stylized commercial look for maximum visual appeal.`,
           // 5. Camera
-          `Camera starts wide then slowly pushes in to a close-up revealing the product surface. No cuts, smooth continuous motion.`,
+          `Camera starts with a wide product shot, then slowly pushes in to an extreme close-up revealing the product surface, materials, and craftsmanship. No cuts, smooth continuous motion.`,
         ].filter(Boolean).join(' '),
       },
       {
-        // Clip 2 (10s): practical use — no face
+        // Clip 2 (10s): practical use — no face, product as hero
         duration: 10,
         cfgScale: 0.8,
-        negativePrompt: [sharedNegative, 'product not visible, product too small', wrongBodyParts].join(', '),
+        negativePrompt: [sharedNegative, 'product not visible, product too small, product in background', wrongBodyParts].join(', '),
         prompt: [
-          // 1. Subject — product name + visual parameters + who is using it
-          `Product: ${detail.name}.`,
-          detail.visual ? `Appearance: ${detail.visual}.` : '',
-          `Used by ${bodyParts}.`,
-          // 2. Action
-          `${action}.`,
+          // 1. Subject — product + user body parts (no face rule first)
+          `No human face shown at any point in this video. This is a product advertisement.`,
+          `Featured product: ${detail.name}.`,
+          detail.visual ? `Product appearance: ${detail.visual}.` : '',
+          detail.sellingPoints ? `Product benefits being demonstrated: ${detail.sellingPoints}.` : '',
+          `The product is the hero of the shot — ${bodyParts} shown interacting with it, face strictly forbidden.`,
+          // 2. Action — demonstrate the product benefit
+          `${action}. The product's quality and benefit are clearly visible throughout.`,
           // 3. Environment
           `${environment}.`,
-          // 4. Style — application context + key details
-          detail.application ? `Application: ${detail.application}.` : '',
-          detail.details ? `Showcase: ${detail.details}.` : '',
-          `Realistic, authentic, natural lighting. No face visible at any point.`,
+          // 4. Style — what the advertisement should communicate
+          detail.application ? `This product is used for: ${detail.application}.` : '',
+          detail.details ? `Showcase these product qualities: ${detail.details}.` : '',
+          `Realistic, authentic, commercial-quality lighting. Product remains in sharp focus and well-lit at all times. No face visible at any point.`,
           // 5. Camera
-          `${cameraShot}. Slow smooth motion throughout.`,
+          `${cameraShot}. Smooth deliberate motion, product always in center of frame.`,
         ].filter(Boolean).join(' '),
       },
     ];
@@ -134,6 +137,7 @@ export class VideoService implements OnModuleInit {
     visual: string;
     application: string;
     details: string;
+    sellingPoints: string;
   } {
     const text = `${title} ${description}`;
 
@@ -153,19 +157,40 @@ export class VideoService implements OnModuleInit {
     const visualParts = [colors, materials, sizes].filter(Boolean);
     const visual = visualParts.length > 0 ? visualParts.join(', ') : '';
 
-    // Application: first sentence of description or a short extract
-    const descSentences = description ? description.split(/[.。,，]/).map(s => s.trim()).filter(s => s.length > 5) : [];
+    // Extract key selling point / feature keywords
+    const sellingPointKeywords = [
+      'waterproof', 'water resistant', 'breathable', 'lightweight', 'durable', 'anti-slip',
+      'fast charging', 'wireless', 'noise cancelling', 'noise canceling', 'bluetooth',
+      'adjustable', 'foldable', 'portable', 'reusable', 'eco-friendly', 'biodegradable',
+      'UV protection', 'SPF', 'anti-bacterial', 'hypoallergenic', 'organic', 'natural',
+      'non-stick', 'heat resistant', 'washable', 'machine washable', 'quick dry',
+      'stretchable', 'elastic', 'double-sided', 'multi-purpose', 'all-in-one',
+      'smart', 'automatic', 'ergonomic', 'anti-scratch', 'shockproof', 'impact resistant',
+      'odor resistant', 'sweat-proof', 'stain resistant', 'wrinkle free',
+    ];
+    const foundPoints = sellingPointKeywords.filter(kw =>
+      new RegExp(`\\b${kw}\\b`, 'i').test(text),
+    );
+    const sellingPoints = foundPoints.length > 0 ? foundPoints.join(', ') : '';
+
+    // Description sentences — use all of them (no truncation)
+    const descSentences = description
+      ? description.split(/[.。]/).map(s => s.trim()).filter(s => s.length > 8)
+      : [];
+
+    // Application: first meaningful sentence
     const application = descSentences[0] ?? '';
 
-    // Details: remaining sentences joined, trimmed to ~120 chars
+    // Details: all remaining sentences joined (up to 300 chars for rich description)
     const detailsRaw = descSentences.slice(1).join('. ');
-    const details = detailsRaw.length > 120 ? detailsRaw.substring(0, 120) + '...' : detailsRaw;
+    const details = detailsRaw.length > 300 ? detailsRaw.substring(0, 300) + '...' : detailsRaw;
 
     return {
       name: title,
       visual,
       application,
       details,
+      sellingPoints,
     };
   }
 
