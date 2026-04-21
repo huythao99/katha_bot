@@ -72,6 +72,7 @@ export class VideoService implements OnModuleInit {
 
   private buildClipsFromProduct(product: { title: string; description: string; price: string }): VideoClip[] {
     const { action, bodyParts, wrongBodyParts, environment, cameraShot } = this.inferPracticalUse(product.title, product.description);
+    const detail = this.extractProductDetail(product.title, product.description);
 
     const sharedNegative = [
       'face, head, portrait',
@@ -86,48 +87,86 @@ export class VideoService implements OnModuleInit {
         // Clip 1 (5s): product hero shot — no person
         duration: 5,
         cfgScale: 0.7,
-        negativePrompt: [
-          'person, human, hands, body',
-          sharedNegative,
-        ].join(', '),
+        negativePrompt: ['person, human, hands, body', sharedNegative].join(', '),
         prompt: [
-          // 1. Subject
-          `A single "${product.title}" product placed on a surface, matching the reference image exactly in color, shape, texture, and design.`,
+          // 1. Subject — product name + visual parameters
+          `Product: ${detail.name}.`,
+          detail.visual ? `Appearance: ${detail.visual}.` : '',
           // 2. Action
-          `The product slowly rotates in place to reveal all sides, details, and surface texture.`,
+          `The product slowly rotates in place to reveal all sides, surface texture, and design details.`,
           // 3. Environment
-          `Clean minimal surface, soft studio lighting from above and sides, neutral background.`,
-          // 4. Style
-          product.description ? `Key features to show: ${product.description}.` : '',
+          `Placed on a clean minimal surface, soft studio lighting from above and sides, neutral background.`,
+          // 4. Style — application context + key details
+          detail.application ? `Product purpose: ${detail.application}.` : '',
+          detail.details ? `Key details to show: ${detail.details}.` : '',
           `Cinematic depth of field, vivid accurate colors, some frames slightly stylized for visual impact.`,
           // 5. Camera
-          `Camera starts wide then slowly pushes in to a close-up of the product surface. No cuts, smooth continuous motion.`,
+          `Camera starts wide then slowly pushes in to a close-up revealing the product surface. No cuts, smooth continuous motion.`,
         ].filter(Boolean).join(' '),
       },
       {
         // Clip 2 (10s): practical use — no face
         duration: 10,
         cfgScale: 0.8,
-        negativePrompt: [
-          sharedNegative,
-          'product not visible, product too small',
-          wrongBodyParts,
-        ].join(', '),
+        negativePrompt: [sharedNegative, 'product not visible, product too small', wrongBodyParts].join(', '),
         prompt: [
-          // 1. Subject
-          `"${product.title}" — identical to reference image in color, shape, and design — held or used by ${bodyParts}.`,
+          // 1. Subject — product name + visual parameters + who is using it
+          `Product: ${detail.name}.`,
+          detail.visual ? `Appearance: ${detail.visual}.` : '',
+          `Used by ${bodyParts}.`,
           // 2. Action
           `${action}.`,
           // 3. Environment
           `${environment}.`,
-          // 4. Style
-          product.description ? `Highlight: ${product.description}.` : '',
+          // 4. Style — application context + key details
+          detail.application ? `Application: ${detail.application}.` : '',
+          detail.details ? `Showcase: ${detail.details}.` : '',
           `Realistic, authentic, natural lighting. No face visible at any point.`,
           // 5. Camera
           `${cameraShot}. Slow smooth motion throughout.`,
         ].filter(Boolean).join(' '),
       },
     ];
+  }
+
+  private extractProductDetail(title: string, description: string): {
+    name: string;
+    visual: string;
+    application: string;
+    details: string;
+  } {
+    const text = `${title} ${description}`;
+
+    // Extract color mentions
+    const colorMatch = text.match(/\b(black|white|red|blue|green|yellow|pink|purple|orange|brown|grey|gray|silver|gold|rose gold|navy|beige|cream|nude|transparent|clear|multicolor|rainbow)\b/gi);
+    const colors = colorMatch ? [...new Set(colorMatch.map(c => c.toLowerCase()))].join(', ') : '';
+
+    // Extract material mentions
+    const materialMatch = text.match(/\b(leather|suede|canvas|mesh|nylon|polyester|cotton|wool|silk|linen|rubber|plastic|metal|aluminum|stainless steel|wood|bamboo|glass|ceramic|foam|silicone|velvet|denim)\b/gi);
+    const materials = materialMatch ? [...new Set(materialMatch.map(m => m.toLowerCase()))].join(', ') : '';
+
+    // Extract size/dimension mentions
+    const sizeMatch = text.match(/\b(\d+\s*cm|\d+\s*mm|\d+\s*inch|\d+\s*L|\d+\s*ml|\d+\s*oz|\bXS\b|\bS\b|\bM\b|\bL\b|\bXL\b|\bXXL\b|size\s*\d+|\d+\s*x\s*\d+)/gi);
+    const sizes = sizeMatch ? [...new Set(sizeMatch)].join(', ') : '';
+
+    // Build visual string from extracted attributes
+    const visualParts = [colors, materials, sizes].filter(Boolean);
+    const visual = visualParts.length > 0 ? visualParts.join(', ') : '';
+
+    // Application: first sentence of description or a short extract
+    const descSentences = description ? description.split(/[.。,，]/).map(s => s.trim()).filter(s => s.length > 5) : [];
+    const application = descSentences[0] ?? '';
+
+    // Details: remaining sentences joined, trimmed to ~120 chars
+    const detailsRaw = descSentences.slice(1).join('. ');
+    const details = detailsRaw.length > 120 ? detailsRaw.substring(0, 120) + '...' : detailsRaw;
+
+    return {
+      name: title,
+      visual,
+      application,
+      details,
+    };
   }
 
   static readonly CATEGORIES: Array<{ label: string; pattern: RegExp; bodyParts: string; wrongBodyParts: string; action: string; environment: string; cameraShot: string }> = [
