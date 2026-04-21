@@ -92,15 +92,16 @@ export class VideoService implements OnModuleInit {
         ].join(', '),
         prompt: [
           // 1. Subject
-          `"${product.title}" product, identical to the reference image — same color, shape, texture, and design.`,
+          `A single "${product.title}" product placed on a surface, matching the reference image exactly in color, shape, texture, and design.`,
           // 2. Action
-          `The product rests still, then slowly rotates to reveal all sides and key design details.`,
+          `The product slowly rotates in place to reveal all sides, details, and surface texture.`,
           // 3. Environment
-          `Clean minimal surface, soft studio lighting from above and sides.`,
+          `Clean minimal surface, soft studio lighting from above and sides, neutral background.`,
           // 4. Style
-          product.description ? `Highlight: ${product.description}. ` : '' + `Cinematic depth of field, vivid colors, some frames slightly stylized for visual impact.`,
+          product.description ? `Key features to show: ${product.description}.` : '',
+          `Cinematic depth of field, vivid accurate colors, some frames slightly stylized for visual impact.`,
           // 5. Camera
-          `Camera starts wide then slowly pushes in to a close-up of the product surface. Smooth deliberate movement, no cuts.`,
+          `Camera starts wide then slowly pushes in to a close-up of the product surface. No cuts, smooth continuous motion.`,
         ].filter(Boolean).join(' '),
       },
       {
@@ -114,13 +115,14 @@ export class VideoService implements OnModuleInit {
         ].join(', '),
         prompt: [
           // 1. Subject
-          `${bodyParts} with "${product.title}" — product identical to reference image in color, shape, and design.`,
+          `"${product.title}" — identical to reference image in color, shape, and design — held or used by ${bodyParts}.`,
           // 2. Action
           `${action}.`,
           // 3. Environment
           `${environment}.`,
           // 4. Style
-          product.description ? `${product.description}. ` : '' + `Realistic, authentic, natural lighting. No face visible.`,
+          product.description ? `Highlight: ${product.description}.` : '',
+          `Realistic, authentic, natural lighting. No face visible at any point.`,
           // 5. Camera
           `${cameraShot}. Slow smooth motion throughout.`,
         ].filter(Boolean).join(' '),
