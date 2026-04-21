@@ -107,18 +107,14 @@ export class VideoService implements OnModuleInit {
         cfgScale: 0.8,
         negativePrompt: [
           sharedNegative,
-          'product out of frame, product not visible, product too small',
+          'product not visible, product too small',
           wrongBodyParts,
         ].join(', '),
         prompt: [
-          `BODY PARTS RULE: Show ONLY the person's ${bodyParts}. Nothing else of the person.`,
-          `ACTION: ${action}.`,
-          `PRODUCT: "${product.title}" must look EXACTLY like the reference image at all times — same color, shape, material, and design. Do not alter the product appearance.`,
-          `FRAMING: Medium close-up showing BOTH the product AND the ${bodyParts} interacting together — both clearly visible in the same frame.`,
-          `MOTION: All movements are slow, smooth, and deliberate. Fluid gestures, no jerky or sudden motion.`,
-          product.description ? `DETAILS to highlight: ${product.description}.` : '',
-          `SETTING: Natural daylight, real-life environment suited to the product's purpose.`,
-          `No face, no text overlays, continuous smooth motion.`,
+          `Close-up shot of ${bodyParts} ${action}.`,
+          `The product is "${product.title}" and looks exactly as in the reference image — same color, shape, and design.`,
+          product.description ? `${product.description}.` : '',
+          `Natural daylight. Slow smooth motion. No face visible.`,
         ].filter(Boolean).join(' '),
       },
     ];
