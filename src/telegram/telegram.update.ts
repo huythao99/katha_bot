@@ -184,29 +184,51 @@ export class TelegramUpdate implements OnModuleInit {
   // Callbacks from VideoService
   // ------------------------------------------------------------------
   private async sendVideo(job: VideoJob) {
+    const isUrl = job.outputPath.startsWith('http://') || job.outputPath.startsWith('https://');
+    const source = isUrl ? job.outputPath : { source: job.outputPath };
+
     try {
-      await this.bot.telegram.sendMessage(job.chatId, 'Your video is ready! Sending now...');
-
-      const isUrl = job.outputPath.startsWith('http://') || job.outputPath.startsWith('https://');
-
-      if (isUrl) {
-        await this.bot.telegram.sendVideo(job.chatId, job.outputPath);
-      } else {
-        await this.bot.telegram.sendVideo(job.chatId, { source: job.outputPath });
-      }
-    } catch (err) {
-      this.logger.error(`Failed to send video for job ${job.id}: ${err.message}`);
-      await this.bot.telegram.sendMessage(
-        job.chatId,
-        `Video generated but could not be sent directly.\nURL: ${job.outputPath}\nError: ${err.message}`,
+      await this.withRetry(() =>
+        this.bot.telegram.sendVideo(job.chatId, source as any),
       );
+    } catch (err) {
+      this.logger.error(`Failed to send video for job ${job.id} after retries: ${err.message}`);
+      await this.withRetry(() =>
+        this.bot.telegram.sendMessage(
+          job.chatId,
+          `Video is ready but could not be delivered.\nError: ${err.message}`,
+        ),
+      ).catch(() => null); // best-effort fallback
     }
   }
 
   private async sendError(job: VideoJob) {
-    await this.bot.telegram.sendMessage(
-      job.chatId,
-      `Video generation failed for job ${job.id}\n\nError: ${job.error}`,
-    );
+    await this.withRetry(() =>
+      this.bot.telegram.sendMessage(
+        job.chatId,
+        `Video generation failed.\n\nError: ${job.error}`,
+      ),
+    ).catch(() => null);
+  }
+
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    maxAttempts = 4,
+    baseDelayMs = 3000,
+  ): Promise<T> {
+    let lastErr: Error;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        if (attempt < maxAttempts) {
+          const delay = baseDelayMs * attempt; // 3s, 6s, 9s
+          this.logger.warn(`Telegram send attempt ${attempt}/${maxAttempts} failed, retrying in ${delay}ms: ${err.message}`);
+          await new Promise((r) => setTimeout(r, delay));
+        }
+      }
+    }
+    throw lastErr;
   }
 }
