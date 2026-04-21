@@ -44,14 +44,14 @@ export class KlingProvider implements VideoProvider {
     this.logger.log(`[Kling] ${totalDuration}s total → ${clips.length} clip(s): [${clips.map(c => `${c.duration}s`).join(', ')}]`);
 
     if (clips.length === 1) {
-      const videoUrl = await this.generateClip({ ...options, prompt: clips[0].prompt }, clips[0].duration, 0);
+      const videoUrl = await this.generateClip(options, clips[0], 0);
       return { videoPath: videoUrl, durationSeconds: clips[0].duration };
     }
 
     const clipUrls: string[] = [];
     for (let i = 0; i < clips.length; i++) {
       this.logger.log(`[Kling] Clip ${i + 1}/${clips.length} (${clips[i].duration}s)...`);
-      const url = await this.generateClip({ ...options, prompt: clips[i].prompt }, clips[i].duration, i);
+      const url = await this.generateClip(options, clips[i], i);
       clipUrls.push(url);
     }
 
@@ -72,7 +72,7 @@ export class KlingProvider implements VideoProvider {
 
   private async generateClip(
     options: VideoGenerateOptions,
-    duration: number,
+    clip: VideoClip,
     clipIndex: number,
   ): Promise<string> {
     const type = options.imageUrl ? 'image2video' : 'text2video';
@@ -80,9 +80,10 @@ export class KlingProvider implements VideoProvider {
 
     const body: any = {
       model: 'kling-v2-master',
-      prompt: options.prompt,
-      duration,
-      cfg_scale: 0.5,
+      prompt: clip.prompt,
+      negative_prompt: clip.negativePrompt ?? '',
+      duration: clip.duration,
+      cfg_scale: clip.cfgScale ?? 0.5,
       mode: options.quality === '1080p' ? 'pro' : 'std',
       ...(options.imageUrl ? { image: options.imageUrl } : {}),
     };

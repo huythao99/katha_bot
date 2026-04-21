@@ -73,15 +73,29 @@ export class VideoService implements OnModuleInit {
   private buildClipsFromProduct(product: { title: string; description: string; price: string }): VideoClip[] {
     const { action, bodyParts } = this.inferPracticalUse(product.title, product.description);
 
+    const sharedNegative = [
+      'face, head, portrait',
+      'wrong product, different product, inconsistent design, color mismatch',
+      'blurry, low quality, distorted, deformed',
+      'text overlay, watermark, subtitle',
+      'abrupt cut, jump cut, shaky camera, unstable motion',
+    ].join(', ');
+
     return [
       {
         // Clip 1 (5s): product hero shot — no person
         duration: 5,
+        cfgScale: 0.7,
+        negativePrompt: [
+          'person, human, hands, body',
+          sharedNegative,
+        ].join(', '),
         prompt: [
           `Hero product showcase of "${product.title}".`,
-          `The product appears exactly as in the reference image — preserve all colors, shape, and design precisely.`,
+          `The product appears exactly as in the reference image — preserve all colors, shape, texture, and design precisely.`,
           `Product rests on a clean minimal surface, gently lit from above and sides.`,
-          `Camera begins wide, slowly pushes in to reveal key details: texture, finish, and distinctive design features.`,
+          `Camera begins wide, slowly and smoothly pushes in to reveal key details: texture, finish, and distinctive design features.`,
+          `All camera movements are slow, deliberate, and cinematic — no sudden cuts.`,
           product.description ? `Visual focus: ${product.description}.` : '',
           `Some frames shift to a slightly stylized, artistic render — vivid colors, cinematic depth of field — to make the product pop visually.`,
           `No person, no hands, no text overlays. Pure product focus.`,
@@ -90,16 +104,19 @@ export class VideoService implements OnModuleInit {
       {
         // Clip 2 (10s): practical use — no face
         duration: 10,
+        cfgScale: 0.8,
+        negativePrompt: sharedNegative,
         prompt: [
           `A person demonstrates the real practical use of "${product.title}" in an authentic lifestyle setting.`,
+          `IMPORTANT: The product must look EXACTLY like the reference image — same color, same shape, same material, same design. Do not change the product's appearance in any way.`,
           `Never show the person's face — show only their ${bodyParts}.`,
-          `The product looks identical to the reference image throughout every frame.`,
+          `All movements are slow, smooth, and deliberate — fluid gestures with no jerky or sudden motion.`,
           `Specifically show: ${action}.`,
+          `Each gesture flows naturally into the next with comfortable pacing — no rushed movements.`,
           product.description ? `The demonstration naturally reveals: ${product.description}.` : '',
-          `Camera alternates between tight close-ups on the person interacting with the product and wider shots showing it in context.`,
+          `Camera moves slowly and steadily — smooth handheld or dolly movement only.`,
           `Setting: natural daylight, real-life environment appropriate to the product's purpose.`,
-          `Mood: confident, satisfying, practical. Some frames may be stylized or cinematic for visual impact.`,
-          `No face visible, no text overlays, smooth flowing motion throughout.`,
+          `No face visible, no text overlays, continuous smooth motion throughout.`,
         ].filter(Boolean).join(' '),
       },
     ];

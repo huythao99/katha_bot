@@ -1,6 +1,8 @@
 export interface VideoClip {
   duration: number;
   prompt: string;
+  negativePrompt?: string;
+  cfgScale?: number; // 0–1, higher = stricter prompt/image adherence
 }
 
 export interface VideoGenerateOptions {
