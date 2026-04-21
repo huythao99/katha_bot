@@ -1,8 +1,14 @@
+export interface VideoClip {
+  duration: number;
+  prompt: string;
+}
+
 export interface VideoGenerateOptions {
   prompt: string;
   imageUrl?: string;
   quality: '720p' | '1080p';
   durationSeconds?: number;
+  clips?: VideoClip[]; // per-clip duration + prompt (used by Kling)
 }
 
 export interface VideoGenerateResult {

@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
-import { VideoProvider, VideoGenerateOptions, VideoGenerateResult } from './video-provider.interface';
+import { VideoProvider, VideoGenerateOptions, VideoGenerateResult, VideoClip } from './video-provider.interface';
 
 const KLING_MAX_CLIP = 10; // Kling max per clip
 
@@ -36,28 +36,37 @@ export class KlingProvider implements VideoProvider {
   }
 
   async generateVideo(options: VideoGenerateOptions): Promise<VideoGenerateResult> {
-    const totalDuration = options.durationSeconds ?? 10;
-    const clipsNeeded = Math.ceil(totalDuration / KLING_MAX_CLIP);
-    const clipDuration = Math.min(totalDuration, KLING_MAX_CLIP);
+    const clips: VideoClip[] = options.clips?.length
+      ? options.clips
+      : this.buildDefaultClips(options);
 
-    this.logger.log(`[Kling] ${totalDuration}s requested → generating ${clipsNeeded} clip(s) of ${clipDuration}s`);
+    const totalDuration = clips.reduce((sum, c) => sum + c.duration, 0);
+    this.logger.log(`[Kling] ${totalDuration}s total → ${clips.length} clip(s): [${clips.map(c => `${c.duration}s`).join(', ')}]`);
 
-    if (clipsNeeded === 1) {
-      const videoUrl = await this.generateClip(options, clipDuration, 0);
-      return { videoPath: videoUrl, durationSeconds: clipDuration };
+    if (clips.length === 1) {
+      const videoUrl = await this.generateClip({ ...options, prompt: clips[0].prompt }, clips[0].duration, 0);
+      return { videoPath: videoUrl, durationSeconds: clips[0].duration };
     }
 
-    // Generate clips sequentially to avoid rate limits
     const clipUrls: string[] = [];
-    for (let i = 0; i < clipsNeeded; i++) {
-      this.logger.log(`[Kling] Generating clip ${i + 1}/${clipsNeeded}...`);
-      const url = await this.generateClip(options, clipDuration, i);
+    for (let i = 0; i < clips.length; i++) {
+      this.logger.log(`[Kling] Clip ${i + 1}/${clips.length} (${clips[i].duration}s)...`);
+      const url = await this.generateClip({ ...options, prompt: clips[i].prompt }, clips[i].duration, i);
       clipUrls.push(url);
     }
 
-    this.logger.log(`[Kling] All clips ready, concatenating to ${totalDuration}s video...`);
+    this.logger.log(`[Kling] Concatenating ${clips.length} clips → ${totalDuration}s`);
     const outputPath = await this.concatenateClips(clipUrls);
     return { videoPath: outputPath, durationSeconds: totalDuration };
+  }
+
+  private buildDefaultClips(options: VideoGenerateOptions): VideoClip[] {
+    const totalDuration = options.durationSeconds ?? 10;
+    const clipsNeeded = Math.ceil(totalDuration / KLING_MAX_CLIP);
+    return Array.from({ length: clipsNeeded }, (_, i) => ({
+      duration: Math.min(totalDuration - i * KLING_MAX_CLIP, KLING_MAX_CLIP),
+      prompt: options.prompt,
+    }));
   }
 
   private async generateClip(
@@ -68,17 +77,9 @@ export class KlingProvider implements VideoProvider {
     const type = options.imageUrl ? 'image2video' : 'text2video';
     const endpoint = `${this.baseUrl}/videos/${type}`;
 
-    // Vary angle/scene per clip for a more dynamic final video
-    const sceneVariants = [
-      options.prompt,
-      `${options.prompt} Show a different angle, close-up product detail shot.`,
-      `${options.prompt} Wide shot showing the product being used in a real-life environment.`,
-    ];
-    const prompt = sceneVariants[clipIndex % sceneVariants.length];
-
     const body: any = {
       model: 'kling-v2-master',
-      prompt,
+      prompt: options.prompt,
       duration,
       cfg_scale: 0.5,
       mode: options.quality === '1080p' ? 'pro' : 'std',

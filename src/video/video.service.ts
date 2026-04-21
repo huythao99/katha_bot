@@ -7,6 +7,7 @@ import { RunwayProvider } from './providers/runway.provider';
 import { KlingProvider } from './providers/kling.provider';
 import { SeedanceProvider } from './providers/seedance.provider';
 import { VideoProvider, VideoGenerateOptions } from './providers/video-provider.interface';
+import type { VideoClip } from './providers/video-provider.interface';
 
 @Injectable()
 export class VideoService implements OnModuleInit {
@@ -98,7 +99,8 @@ export class VideoService implements OnModuleInit {
         prompt: this.buildPromptFromProduct(product),
         imageUrl: product.images[0],
         quality: job.input.quality,
-        durationSeconds: Number(this.config.get('VIDEO_DURATION_SECONDS', 5)),
+        durationSeconds: 15,
+        clips: this.buildClipsFromProduct(product),
       };
     } else {
       options = {
@@ -113,31 +115,46 @@ export class VideoService implements OnModuleInit {
     job.outputPath = result.videoPath;
   }
 
-  private buildPromptFromProduct(product: { title: string; description: string; price: string }): string {
+  private buildClipsFromProduct(product: { title: string; description: string; price: string }): VideoClip[] {
     return [
-      // Scene: person using the product
-      `A short, realistic TikTok-style product advertisement.`,
-      `A real person is naturally using "${product.title}" in an everyday lifestyle setting.`,
-      `The product looks exactly as shown in the reference image — same colors, shape, and design must be preserved.`,
+      {
+        // Clip 1 (5s): product showcase — no person, product is the star
+        duration: 5,
+        prompt: [
+          `Product showcase video of "${product.title}".`,
+          `The product appears exactly as in the reference image — preserve all colors, shape, and design.`,
+          `The product sits on a clean surface or floats gently in a bright, minimal environment.`,
+          `Camera slowly orbits and zooms into key product details.`,
+          product.description ? `Highlight these features visually: ${product.description}.` : '',
+          `Style: cinematic, sharp focus, soft studio lighting, no person, no hands, no text.`,
+          `Some frames may use stylized or slightly artistic rendering to make the product visually striking.`,
+        ].filter(Boolean).join(' '),
+      },
+      {
+        // Clip 2 (10s): person using product — no face shown
+        duration: 10,
+        prompt: [
+          `A person is actively using "${product.title}" in a real-life lifestyle setting.`,
+          `Show only the person's hands and body — never show their face.`,
+          `The product looks identical to the reference image throughout.`,
+          `The hands interact naturally with the product: picking it up, using it, and demonstrating its value.`,
+          product.description ? `The interaction highlights: ${product.description}.` : '',
+          `Camera: close-up on hands and product, occasional wider shots of the lifestyle environment.`,
+          `Setting: natural daylight, home or outdoor casual environment.`,
+          `Style: authentic and realistic overall, but some frames may have a stylized or cinematic look for visual impact.`,
+          `No face, no text overlays, smooth continuous motion.`,
+        ].filter(Boolean).join(' '),
+      },
+    ];
+  }
 
-      // Action & interaction
-      `The person confidently picks up, holds, and actively uses the product.`,
-      `Their facial expression is happy and satisfied, showing genuine enjoyment.`,
-      `The product is clearly visible and stays in frame throughout.`,
-
-      // Description context
-      product.description ? `The video highlights these product features naturally: ${product.description}.` : '',
-
-      // Camera
-      `Camera: handheld feel with slight motion, close-up on product in use, then pull back to show the person's full reaction.`,
-
-      // Environment & lighting
-      `Setting: bright, natural daylight environment — home, outdoors, or a casual lifestyle space.`,
-      `Lighting: natural and flattering, not studio-like. Realistic shadows and textures.`,
-
-      // Style
-      `Style: ultra-realistic, authentic, cinematic quality. Smooth natural motion. No floating effects, no text overlays.`,
-      `Feels like a real person's genuine product review, suitable for TikTok and Instagram Reels.`,
+  private buildPromptFromProduct(product: { title: string; description: string; price: string }): string {
+    // Fallback prompt used by non-Kling providers (Veo, Runway, Seedance)
+    return [
+      `A short TikTok-style product advertisement for "${product.title}".`,
+      product.description ? `Product details: ${product.description}.` : '',
+      `Show a person naturally using the product in a lifestyle setting.`,
+      `Style: realistic, cinematic, vibrant colors, suitable for social media.`,
     ].filter(Boolean).join(' ');
   }
 }
