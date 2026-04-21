@@ -56,7 +56,8 @@ export class KlingProvider implements VideoProvider {
     }
 
     this.logger.log(`[Kling] Concatenating ${clips.length} clips → ${totalDuration}s`);
-    const outputPath = await this.concatenateClips(clipUrls);
+    const clipMeta = clipUrls.map((url, i) => ({ url, duration: clips[i].duration }));
+    const outputPath = await this.concatenateClips(clipMeta, options.title);
     return { videoPath: outputPath, durationSeconds: totalDuration };
   }
 
@@ -138,29 +139,82 @@ export class KlingProvider implements VideoProvider {
 
   // ------------------------------------------------------------------
   // Download clips locally then concatenate with ffmpeg
+  // xfade transition between clips + optional product title overlay
   // ------------------------------------------------------------------
-  private async concatenateClips(clipUrls: string[]): Promise<string> {
+  private async concatenateClips(
+    clips: Array<{ url: string; duration: number }>,
+    title?: string,
+  ): Promise<string> {
     const tmpDir = path.join(process.cwd(), 'tmp');
     fs.mkdirSync(tmpDir, { recursive: true });
 
     const ts = Date.now();
-
-    // Download all clips
     const localPaths = await Promise.all(
-      clipUrls.map((url, i) => this.downloadFile(url, path.join(tmpDir, `clip_${ts}_${i}.mp4`))),
+      clips.map((c, i) => this.downloadFile(c.url, path.join(tmpDir, `clip_${ts}_${i}.mp4`))),
     );
 
-    // Write ffmpeg concat list
-    const listFile = path.join(tmpDir, `list_${ts}.txt`);
-    fs.writeFileSync(listFile, localPaths.map((p) => `file '${p}'`).join('\n'));
-
     const outputFile = path.join(tmpDir, `final_${ts}.mp4`);
-    execSync(`ffmpeg -f concat -safe 0 -i "${listFile}" -c copy "${outputFile}" -y`, { stdio: 'pipe' });
+    const TRANSITION = 0.5; // xfade duration in seconds
+    const TITLE_DURATION = 3; // seconds the title overlay is visible
 
-    // Cleanup temp files
+    // Safe title for ffmpeg drawtext (strip special chars)
+    const safeTitle = title
+      ? title.replace(/['"\\:[\]]/g, '').substring(0, 60)
+      : null;
+
+    const inputs = localPaths.map((p) => `-i "${p}"`).join(' ');
+
+    // Build filter_complex: chain xfades then optionally add title overlay
+    const filterParts: string[] = [];
+    let prevLabel = '[0:v]';
+    let offset = 0;
+
+    for (let i = 1; i < clips.length; i++) {
+      offset += clips[i - 1].duration - TRANSITION;
+      const outLabel = `[xf${i}]`;
+      filterParts.push(
+        `${prevLabel}[${i}:v]xfade=transition=fade:duration=${TRANSITION}:offset=${offset}${outLabel}`,
+      );
+      prevLabel = outLabel;
+    }
+
+    if (safeTitle) {
+      filterParts.push(
+        `${prevLabel}drawtext=` +
+        `text='${safeTitle}':` +
+        `fontsize=52:fontcolor=white:` +
+        `x=(w-text_w)/2:y=h*0.83:` +
+        `box=1:boxcolor=black@0.55:boxborderw=14:` +
+        `enable='between(t\\,0\\,${TITLE_DURATION})'` +
+        `[vout]`,
+      );
+      prevLabel = '[vout]';
+    }
+
+    let cmd: string;
+
+    if (localPaths.length === 1 && !safeTitle) {
+      // Single clip, no title — fast copy
+      cmd = `ffmpeg -i "${localPaths[0]}" -c copy "${outputFile}" -y`;
+    } else if (localPaths.length === 1 && safeTitle) {
+      // Single clip with title overlay
+      cmd =
+        `ffmpeg -i "${localPaths[0]}" ` +
+        `-vf "drawtext=text='${safeTitle}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h*0.83:box=1:boxcolor=black@0.55:boxborderw=14:enable='between(t\\,0\\,${TITLE_DURATION})'" ` +
+        `-c:v libx264 -crf 18 -preset fast -c:a copy "${outputFile}" -y`;
+    } else {
+      // Multiple clips: xfade + optional title overlay
+      const filterComplex = filterParts.join(';');
+      cmd =
+        `ffmpeg ${inputs} ` +
+        `-filter_complex "${filterComplex}" ` +
+        `-map "${prevLabel}" ` +
+        `-c:v libx264 -crf 18 -preset fast "${outputFile}" -y`;
+    }
+
+    execSync(cmd, { stdio: 'pipe' });
+
     localPaths.forEach((p) => fs.unlink(p, () => null));
-    fs.unlink(listFile, () => null);
-
     this.logger.log(`[Kling] Final video: ${outputFile}`);
     return outputFile;
   }

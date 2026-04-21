@@ -5,6 +5,7 @@ export interface VideoClip {
 
 export interface VideoGenerateOptions {
   prompt: string;
+  title?: string;       // product title — used for text overlay
   imageUrl?: string;
   quality: '720p' | '1080p';
   durationSeconds?: number;

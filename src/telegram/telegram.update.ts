@@ -30,16 +30,34 @@ export class TelegramUpdate implements OnModuleInit {
 
   @Start()
   async onStart(@Ctx() ctx: Context) {
+    const categoryList = VideoService.CATEGORIES
+      .map((c) => `• ${c.label}`)
+      .join('\n');
+
     await ctx.reply(
       `Welcome to Katha Bot!\n\n` +
-      `I generate product videos from TikTok Shop links or images.\n\n` +
+      `I generate product videos from TikTok Shop links or images using Kling AI.\n\n` +
       `How to use:\n` +
-      `  Send a TikTok Shop link → auto product video\n` +
+      `  Send a TikTok Shop link → auto product video (15s)\n` +
       `  Send a photo + caption → caption becomes the prompt\n\n` +
       `Commands:\n` +
       `/quality — set output quality (720p / 1080p)\n` +
       `/status <job_id> — check job progress\n` +
+      `/categories — show supported product categories\n` +
       `/help — show this message`,
+    );
+  }
+
+  @Command('categories')
+  async onCategories(@Ctx() ctx: Context) {
+    const categoryList = VideoService.CATEGORIES
+      .map((c, i) => `${i + 1}. ${c.label}`)
+      .join('\n');
+
+    await ctx.reply(
+      `Supported product categories (${VideoService.CATEGORIES.length} total):\n\n` +
+      `${categoryList}\n\n` +
+      `Category is detected automatically from the product title and description.`,
     );
   }
 
