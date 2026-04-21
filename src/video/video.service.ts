@@ -115,15 +115,29 @@ export class VideoService implements OnModuleInit {
 
   private buildPromptFromProduct(product: { title: string; description: string; price: string }): string {
     return [
-      `A lively and energetic product advertisement video.`,
-      `Product: ${product.title}.`,
-      product.description ? `Details: ${product.description}.` : '',
-      `Show a real person actively using this product in daily life.`,
-      `Include close-up shots of the product details, a happy person interacting with it naturally,`,
-      `and dynamic lifestyle scenes that highlight its key benefits.`,
-      `Style: vibrant colors, smooth cinematic motion, upbeat energy, professional lighting,`,
-      `suitable for TikTok and social media e-commerce advertising.`,
-      product.price ? `Price tag shown: ${product.price}.` : '',
+      // Scene: person using the product
+      `A short, realistic TikTok-style product advertisement.`,
+      `A real person is naturally using "${product.title}" in an everyday lifestyle setting.`,
+      `The product looks exactly as shown in the reference image — same colors, shape, and design must be preserved.`,
+
+      // Action & interaction
+      `The person confidently picks up, holds, and actively uses the product.`,
+      `Their facial expression is happy and satisfied, showing genuine enjoyment.`,
+      `The product is clearly visible and stays in frame throughout.`,
+
+      // Description context
+      product.description ? `The video highlights these product features naturally: ${product.description}.` : '',
+
+      // Camera
+      `Camera: handheld feel with slight motion, close-up on product in use, then pull back to show the person's full reaction.`,
+
+      // Environment & lighting
+      `Setting: bright, natural daylight environment — home, outdoors, or a casual lifestyle space.`,
+      `Lighting: natural and flattering, not studio-like. Realistic shadows and textures.`,
+
+      // Style
+      `Style: ultra-realistic, authentic, cinematic quality. Smooth natural motion. No floating effects, no text overlays.`,
+      `Feels like a real person's genuine product review, suitable for TikTok and Instagram Reels.`,
     ].filter(Boolean).join(' ');
   }
 }
