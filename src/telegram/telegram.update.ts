@@ -37,7 +37,6 @@ export class TelegramUpdate implements OnModuleInit {
       `  Send a TikTok Shop link → auto product video\n` +
       `  Send a photo + caption → caption becomes the prompt\n\n` +
       `Commands:\n` +
-      `/provider — choose video generation API\n` +
       `/quality — set output quality (720p / 1080p)\n` +
       `/status <job_id> — check job progress\n` +
       `/help — show this message`,
@@ -59,34 +58,6 @@ export class TelegramUpdate implements OnModuleInit {
           Markup.button.callback('1080p', 'quality_1080'),
         ],
       ]),
-    );
-  }
-
-  @Command('provider')
-  async onProvider(@Ctx() ctx: Context) {
-    const chatId = ctx.chat.id;
-    const current = this.video.getUserProvider(chatId);
-    const providers = this.video.listProviders();
-
-    const buttons = providers.map((p) =>
-      Markup.button.callback(
-        `${p.name === current ? '✓ ' : ''}${p.displayName}`,
-        `provider_${p.name}`,
-      ),
-    );
-
-    // 2 per row
-    const rows = [];
-    for (let i = 0; i < buttons.length; i += 2) {
-      rows.push(buttons.slice(i, i + 2));
-    }
-
-    await ctx.reply(
-      `Current provider: *${providers.find((p) => p.name === current)?.displayName ?? current}*\n\nSelect a provider:`,
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(rows),
-      },
     );
   }
 
@@ -132,44 +103,6 @@ export class TelegramUpdate implements OnModuleInit {
     await ctx.editMessageText('Quality set to 1080p');
   }
 
-  @Action(/^provider_(.+)$/)
-  async onProviderSelect(@Ctx() ctx: Context) {
-    const match = (ctx as any).match;
-    const providerName: string = match[1];
-    const chatId = ctx.chat.id;
-
-    const ok = this.video.setUserProvider(chatId, providerName);
-    if (!ok) {
-      await ctx.answerCbQuery(`Unknown provider: ${providerName}`);
-      return;
-    }
-
-    const providers = this.video.listProviders();
-    const selected = providers.find((p) => p.name === providerName);
-
-    // Rebuild keyboard with updated checkmark
-    const buttons = providers.map((p) =>
-      Markup.button.callback(
-        `${p.name === providerName ? '✓ ' : ''}${p.displayName}`,
-        `provider_${p.name}`,
-      ),
-    );
-    const rows = [];
-    for (let i = 0; i < buttons.length; i += 2) {
-      rows.push(buttons.slice(i, i + 2));
-    }
-
-    await ctx.editMessageText(
-      `Current provider: *${selected?.displayName ?? providerName}*\n\nSelect a provider:`,
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(rows),
-      },
-    );
-
-    await ctx.answerCbQuery(`Switched to ${selected?.displayName ?? providerName}`);
-  }
-
   // ------------------------------------------------------------------
   // Message handlers
   // ------------------------------------------------------------------
@@ -184,19 +117,17 @@ export class TelegramUpdate implements OnModuleInit {
     if (!this.tiktok.isTiktokLink(text)) {
       await ctx.reply(
         'Please send a TikTok Shop link, or a photo with a caption as your prompt.\n' +
-        'Use /provider to choose the AI, /quality to set resolution.',
+        'Use /quality to set resolution.',
       );
       return;
     }
 
-    const quality = this.userQuality.get(chatId) ?? '1080p';
-    const provider = this.video.getUserProvider(chatId);
+    const quality = this.userQuality.get(chatId) ?? '720p';
     const jobId = await this.video.queueFromTiktok(text, chatId, quality);
 
     await ctx.reply(
       `TikTok link received! Scraping product info...\n\n` +
       `Job ID: \`${jobId}\`\n` +
-      `Provider: ${this.video.listProviders().find((p) => p.name === provider)?.displayName ?? provider}\n` +
       `Quality: ${quality}\n\n` +
       `I will send the video when ready.`,
       { parse_mode: 'Markdown' },
@@ -218,15 +149,13 @@ export class TelegramUpdate implements OnModuleInit {
     const fileId = photos[photos.length - 1].file_id;
     const fileUrl = await ctx.telegram.getFileLink(fileId);
 
-    const quality = this.userQuality.get(chatId) ?? '1080p';
-    const provider = this.video.getUserProvider(chatId);
+    const quality = this.userQuality.get(chatId) ?? '720p';
     const jobId = await this.video.queueFromImage(fileUrl.href, prompt, chatId, quality);
 
     await ctx.reply(
       `Image received!\n` +
       `Prompt: "${prompt}"\n\n` +
       `Job ID: \`${jobId}\`\n` +
-      `Provider: ${this.video.listProviders().find((p) => p.name === provider)?.displayName ?? provider}\n` +
       `Quality: ${quality}\n\n` +
       `I will send the video when ready.`,
       { parse_mode: 'Markdown' },
