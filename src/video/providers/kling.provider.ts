@@ -194,15 +194,17 @@ export class KlingProvider implements VideoProvider {
 
     let cmd: string;
 
+    const encodeFlags = `-c:v libx264 -crf 18 -preset fast -pix_fmt yuv420p`;
+
     if (localPaths.length === 1 && !safeTitle) {
-      // Single clip, no title — fast copy
-      cmd = `ffmpeg -i "${localPaths[0]}" -c copy "${outputFile}" -y`;
+      // Single clip, no title — re-encode to ensure yuv420p compatibility
+      cmd = `ffmpeg -i "${localPaths[0]}" ${encodeFlags} "${outputFile}" -y`;
     } else if (localPaths.length === 1 && safeTitle) {
       // Single clip with title overlay
       cmd =
         `ffmpeg -i "${localPaths[0]}" ` +
         `-vf "drawtext=text='${safeTitle}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h*0.83:box=1:boxcolor=black@0.55:boxborderw=14:enable='between(t\\,0\\,${TITLE_DURATION})'" ` +
-        `-c:v libx264 -crf 18 -preset fast -c:a copy "${outputFile}" -y`;
+        `${encodeFlags} "${outputFile}" -y`;
     } else {
       // Multiple clips: xfade + optional title overlay
       const filterComplex = filterParts.join(';');
@@ -210,7 +212,7 @@ export class KlingProvider implements VideoProvider {
         `ffmpeg ${inputs} ` +
         `-filter_complex "${filterComplex}" ` +
         `-map "${prevLabel}" ` +
-        `-c:v libx264 -crf 18 -preset fast "${outputFile}" -y`;
+        `${encodeFlags} "${outputFile}" -y`;
     }
 
     execSync(cmd, { stdio: 'pipe' });
