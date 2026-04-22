@@ -75,7 +75,8 @@ export class KlingProvider implements VideoProvider {
     clip: VideoClip,
     clipIndex: number,
   ): Promise<string> {
-    const type = options.imageUrl ? 'image2video' : 'text2video';
+    const imageUrl = clip.imageUrl ?? options.imageUrl;
+    const type = imageUrl ? 'image2video' : 'text2video';
     const endpoint = `${this.baseUrl}/videos/${type}`;
 
     const body: any = {
@@ -85,7 +86,7 @@ export class KlingProvider implements VideoProvider {
       duration: clip.duration,
       cfg_scale: clip.cfgScale ?? 0.5,
       mode: options.quality === '1080p' ? 'pro' : 'std',
-      ...(options.imageUrl ? { image: options.imageUrl } : {}),
+      ...(imageUrl ? { image: imageUrl } : {}),
     };
 
     const submitRes = await fetch(endpoint, {

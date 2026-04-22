@@ -3,6 +3,7 @@ export interface VideoClip {
   prompt: string;
   negativePrompt?: string;
   cfgScale?: number; // 0–1, higher = stricter prompt/image adherence
+  imageUrl?: string; // per-clip reference image (overrides options.imageUrl)
 }
 
 export interface VideoGenerateOptions {

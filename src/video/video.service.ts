@@ -70,7 +70,7 @@ export class VideoService implements OnModuleInit {
     job.outputPath = result.videoPath;
   }
 
-  private buildClipsFromProduct(product: { title: string; description: string; price: string }): VideoClip[] {
+  private buildClipsFromProduct(product: { title: string; description: string; price: string; images: string[] }): VideoClip[] {
     const { action, bodyParts, wrongBodyParts, environment, cameraShot } = this.inferPracticalUse(product.title, product.description);
     const detail = this.extractProductDetail(product.title, product.description);
 
@@ -87,6 +87,7 @@ export class VideoService implements OnModuleInit {
         // Clip 1 (5s): product hero shot — no person, rich product showcase
         duration: 5,
         cfgScale: 0.7,
+        imageUrl: product.images[0],
         negativePrompt: ['person, human, hands, body', sharedNegative].join(', '),
         prompt: [
           // 1. Subject — full product identity
@@ -109,6 +110,7 @@ export class VideoService implements OnModuleInit {
         // Clip 2 (10s): practical use — no face, product as hero
         duration: 10,
         cfgScale: 0.8,
+        imageUrl: product.images[1] ?? product.images[0],
         negativePrompt: [sharedNegative, 'product not visible, product too small, product in background', wrongBodyParts].join(', '),
         prompt: [
           // 1. Subject — product + user body parts (no face rule first)
