@@ -71,11 +71,11 @@ export class VideoService implements OnModuleInit {
     job.outputPath = result.videoPath;
   }
 
-  // Each image → one 5s clip built from dynamic scene components (max 5 clips = 25s)
+  // Each image → one 5s clip built from dynamic scene components (max 4 clips = 20s)
   private buildClipsFromProduct(product: { title: string; description: string; price: string; images: string[] }): VideoClip[] {
     const detail = this.extractProductDetail(product.title, product.description);
     const scene = this.buildSceneComponents(product.title, product.description);
-    const images = product.images.slice(0, 5);
+    const images = product.images.slice(0, 4);
 
     const sharedNegative = [
       'wrong product, different product, inconsistent design, color mismatch',

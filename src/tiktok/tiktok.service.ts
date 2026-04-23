@@ -104,7 +104,7 @@ export class TiktokService {
           if (img.src && !images.includes(img.src)) images.push(img.src);
         });
 
-        return { title, description, price, images: images.slice(0, 5) };
+        return { title, description, price, images: images.slice(0, 4) };
       });
 
       return {
