@@ -48,14 +48,15 @@ export class VideoService implements OnModuleInit {
 
     if (job.input.type === 'tiktok') {
       const product = await this.tiktok.scrapeProduct(job.input.url);
-      this.logger.log(`[Job ${job.id}] Scraped: ${product.title}`);
+      this.logger.log(`[Job ${job.id}] Scraped: ${product.title} (${product.images.length} images)`);
+      const clips = this.buildClipsFromProduct(product);
       options = {
         prompt: this.buildPromptFromProduct(product),
         title: product.title,
         imageUrl: product.images[0],
         quality: job.input.quality,
-        durationSeconds: 15,
-        clips: this.buildClipsFromProduct(product),
+        durationSeconds: clips.length * 5,
+        clips,
       };
     } else {
       options = {
@@ -70,68 +71,172 @@ export class VideoService implements OnModuleInit {
     job.outputPath = result.videoPath;
   }
 
+  // Each image → one 5s clip built from dynamic scene components (max 5 clips = 25s)
   private buildClipsFromProduct(product: { title: string; description: string; price: string; images: string[] }): VideoClip[] {
-    const { action, bodyParts, wrongBodyParts, environment, cameraShot } = this.inferPracticalUse(product.title, product.description);
     const detail = this.extractProductDetail(product.title, product.description);
+    const scene = this.buildSceneComponents(product.title, product.description);
+    const images = product.images.slice(0, 5);
 
     const sharedNegative = [
-      'face, human face, eyes, nose, mouth, chin, forehead, portrait, selfie',
       'wrong product, different product, inconsistent design, color mismatch',
       'blurry, low quality, distorted, deformed',
       'text overlay, watermark, subtitle',
       'abrupt cut, jump cut, shaky camera, unstable motion',
     ].join(', ');
 
-    return [
+    // Per-clip variation: action + camera angle change each clip while subject/environment stay consistent
+    const clipVariations: Array<{ action: string; detailFocus: string; camera: string }> = [
       {
-        // Clip 1 (5s): product hero shot — no person, rich product showcase
-        duration: 5,
-        cfgScale: 0.7,
-        imageUrl: product.images[0],
-        negativePrompt: ['person, human, hands, body', sharedNegative].join(', '),
-        prompt: [
-          // 1. Subject — full product identity
-          `Advertisement product showcase: ${detail.name}.`,
-          detail.visual ? `Visual appearance: ${detail.visual}.` : '',
-          detail.sellingPoints ? `Key features: ${detail.sellingPoints}.` : '',
-          // 2. Action — reveal design details
-          `The product slowly rotates in place revealing all sides, surface texture, stitching, logo, and design details up close.`,
-          // 3. Environment
-          `Placed on a clean minimal surface, soft studio lighting from above and sides creating gentle highlights that emphasize product quality, neutral background.`,
-          // 4. Style — product purpose and what to highlight
-          detail.application ? `Product purpose: ${detail.application}.` : '',
-          detail.details ? `Highlight these product details: ${detail.details}.` : '',
-          `Cinematic depth of field, vivid accurate product colors, stylized commercial look for maximum visual appeal.`,
-          // 5. Camera
-          `Camera starts with a wide product shot, then slowly pushes in to an extreme close-up revealing the product surface, materials, and craftsmanship. No cuts, smooth continuous motion.`,
-        ].filter(Boolean).join(' '),
+        action: scene.primaryAction,
+        detailFocus: detail.visual ? `The ${detail.visual} product is shown clearly in full.` : '',
+        camera: 'Wide shot, camera slowly pushes in toward the product.',
       },
       {
-        // Clip 2 (10s): practical use — no face, product as hero
-        duration: 10,
-        cfgScale: 0.8,
-        imageUrl: product.images[1] ?? product.images[0],
-        negativePrompt: [sharedNegative, 'product not visible, product too small, product in background', wrongBodyParts].join(', '),
-        prompt: [
-          // 1. Subject — product + user body parts (no face rule first)
-          `No human face shown at any point in this video. This is a product advertisement.`,
-          `Featured product: ${detail.name}.`,
-          detail.visual ? `Product appearance: ${detail.visual}.` : '',
-          detail.sellingPoints ? `Product benefits being demonstrated: ${detail.sellingPoints}.` : '',
-          `The product is the hero of the shot — ${bodyParts} shown interacting with it, face strictly forbidden.`,
-          // 2. Action — demonstrate the product benefit
-          `${action}. The product's quality and benefit are clearly visible throughout.`,
-          // 3. Environment
-          `${environment}.`,
-          // 4. Style — what the advertisement should communicate
-          detail.application ? `This product is used for: ${detail.application}.` : '',
-          detail.details ? `Showcase these product qualities: ${detail.details}.` : '',
-          `Realistic, authentic, commercial-quality lighting. Product remains in sharp focus and well-lit at all times. No face visible at any point.`,
-          // 5. Camera
-          `${cameraShot}. Smooth deliberate motion, product always in center of frame.`,
-        ].filter(Boolean).join(' '),
+        action: scene.secondaryAction,
+        detailFocus: scene.materialBehavior,
+        camera: 'Close-up shot, shallow depth of field, product surface in sharp focus.',
+      },
+      {
+        action: `${scene.primaryAction}, viewed from a different angle`,
+        detailFocus: detail.sellingPoints ? `Highlighting: ${detail.sellingPoints}.` : scene.materialBehavior,
+        camera: 'Side angle sweep, smooth tracking motion.',
+      },
+      {
+        action: scene.secondaryAction,
+        detailFocus: detail.details ? `Close-up on: ${detail.details}.` : scene.detailCloseup,
+        camera: 'Macro extreme close-up, slow reveal of fine details.',
+      },
+      {
+        action: scene.primaryAction,
+        detailFocus: scene.detailCloseup,
+        camera: 'Final hero shot — product centered, dramatic lighting, slow gentle zoom out.',
       },
     ];
+
+    return images.map((imageUrl, i) => {
+      const v = clipVariations[i] ?? clipVariations[0];
+      return {
+        duration: 5,
+        cfgScale: 0.8,
+        imageUrl,
+        negativePrompt: sharedNegative,
+        // Assembled as a flowing narrative sentence — same structure as the Gemini example
+        prompt: [
+          // [Subject wearing/featuring product]
+          `${scene.subject} ${detail.name}${detail.visual ? ` (${detail.visual})` : ''}.`,
+          // [Action] in [Environment]
+          `${v.action} in ${scene.environment}.`,
+          // [Material behavior / product in scene]
+          `${v.detailFocus}`,
+          // [Detail close-up instruction]
+          `${scene.detailCloseup}.`,
+          // [Application context — first clip only]
+          i === 0 && detail.application ? `${detail.application}.` : '',
+          // [Style]
+          `${scene.style}.`,
+          // [Camera]
+          `${v.camera}`,
+        ].filter(Boolean).join(' '),
+      };
+    });
+  }
+
+  // Extracts dynamic scene components from product title + description.
+  // Structure mirrors: [subject] [action] in [environment]. [material behavior]. Close-up on [detail]. [style].
+  private buildSceneComponents(title: string, description: string): {
+    subject: string;
+    primaryAction: string;
+    secondaryAction: string;
+    environment: string;
+    materialBehavior: string;
+    detailCloseup: string;
+    style: string;
+  } {
+    const text = `${title} ${description}`.toLowerCase();
+
+    // --- Subject: who/what is in the scene ---
+    const subjectMap: Array<{ pattern: RegExp; subject: string }> = [
+      { pattern: /dress|skirt|áo|silk|blouse|qipao|kimono|hanbok|sari/, subject: 'A woman wearing' },
+      { pattern: /shirt|polo|tee|hoodie|sweater|jacket|coat|vest/, subject: 'A person wearing' },
+      { pattern: /shoe|sneaker|boot|sandal|slipper|heel/, subject: 'A pair of' },
+      { pattern: /bag|backpack|tote|handbag|purse|wallet/, subject: 'A' },
+      { pattern: /watch|bracelet|ring|necklace|earring|pendant/, subject: 'A person wearing' },
+      { pattern: /hat|cap|beanie/, subject: 'A person wearing' },
+      { pattern: /phone|laptop|keyboard|mouse/, subject: 'A' },
+      { pattern: /skincare|cream|serum|lotion/, subject: 'A close-up of' },
+      { pattern: /perfume|cologne|fragrance/, subject: 'An elegant bottle of' },
+    ];
+    const subjectEntry = subjectMap.find(e => e.pattern.test(text));
+    const subject = subjectEntry?.subject ?? 'A product shot of';
+
+    // --- Primary action: main motion in the scene ---
+    const actionMap: Array<{ pattern: RegExp; primary: string; secondary: string }> = [
+      { pattern: /dress|skirt|silk|áo|blouse/, primary: 'walking slowly', secondary: 'turning gracefully' },
+      { pattern: /shoe|sneaker|boot|sandal/, primary: 'stepping forward on a clean surface', secondary: 'rotating to reveal the sole and profile' },
+      { pattern: /bag|backpack|tote/, primary: 'placed elegantly on a surface, gently handled', secondary: 'lifted and held naturally' },
+      { pattern: /watch|bracelet|ring/, primary: 'worn on a wrist, catching the light as it moves', secondary: 'placed on a surface, slowly rotating' },
+      { pattern: /jacket|coat|hoodie/, primary: 'draped and gently swaying', secondary: 'laid flat, slowly revealed from top to bottom' },
+      { pattern: /phone|laptop|keyboard/, primary: 'placed on a clean desk, in focus', secondary: 'slowly rotating on its axis' },
+      { pattern: /skincare|cream|serum/, primary: 'dispensed and applied to smooth skin', secondary: 'product bottle slowly rotating' },
+      { pattern: /perfume|fragrance/, primary: 'held elegantly, mist released in a soft arc', secondary: 'placed on a marble surface, rotating slowly' },
+    ];
+    const actionEntry = actionMap.find(e => e.pattern.test(text));
+    const primaryAction = actionEntry?.primary ?? 'displayed on a clean surface, slowly rotating';
+    const secondaryAction = actionEntry?.secondary ?? 'revealed from multiple angles with smooth camera movement';
+
+    // --- Environment: location + lighting ---
+    const envMap: Array<{ pattern: RegExp; environment: string }> = [
+      { pattern: /silk|áo|dress|skirt|traditional|hanbok|kimono|sari|qipao/, environment: 'a sunlit heritage location with warm golden-hour light' },
+      { pattern: /outdoor|sport|running|gym|fitness/, environment: 'an outdoor lifestyle setting with natural sunlight' },
+      { pattern: /skincare|makeup|beauty|serum|cream/, environment: 'a clean white vanity with soft diffused natural light' },
+      { pattern: /perfume|fragrance|cologne/, environment: 'an elegant minimal interior with marble surface and side lighting' },
+      { pattern: /shoe|sneaker|boot/, environment: 'a clean floor surface with soft studio lighting' },
+      { pattern: /watch|jewelry|ring|bracelet/, environment: 'a minimal dark surface with dramatic spotlight' },
+      { pattern: /phone|laptop|keyboard|tech/, environment: 'a modern clean desk setup with soft ambient light' },
+      { pattern: /bag|wallet|purse/, environment: 'a clean lifestyle backdrop with warm natural light' },
+    ];
+    const envEntry = envMap.find(e => e.pattern.test(text));
+    const environment = envEntry?.environment ?? 'a clean minimal studio with soft directional lighting';
+
+    // --- Material behavior: how the product looks/feels in the scene ---
+    const materialBehaviorMap: Array<{ pattern: RegExp; behavior: string }> = [
+      { pattern: /silk|satin|chiffon|tơ|lụa/, behavior: 'The lightweight fabric gently drifts and catches the light, revealing its natural sheen' },
+      { pattern: /leather|suede/, behavior: 'The rich leather surface catches the light, showing its texture and depth' },
+      { pattern: /wool|knit|cashmere/, behavior: 'The soft fabric drapes naturally, its texture visible in the gentle light' },
+      { pattern: /metal|stainless steel|aluminum/, behavior: 'The polished surface reflects light with a premium metallic gleam' },
+      { pattern: /glass|crystal|transparent/, behavior: 'Light passes through the material, creating beautiful refractions' },
+      { pattern: /cotton|linen|canvas/, behavior: 'The fabric moves naturally, its weave visible in the warm lighting' },
+    ];
+    const behaviorEntry = materialBehaviorMap.find(e => e.pattern.test(text));
+    const materialBehavior = behaviorEntry?.behavior ?? 'The product surface catches the light, emphasizing its quality and finish';
+
+    // --- Detail close-up: what specific detail to show ---
+    const detailMap: Array<{ pattern: RegExp; detail: string }> = [
+      { pattern: /embroid|thêu|flower|floral/, detail: 'Close-up on the intricate embroidery patterns and delicate floral details' },
+      { pattern: /stitch|seam|hem/, detail: 'Close-up on the precise stitching and clean finishing' },
+      { pattern: /sole|outsole/, detail: 'Close-up on the textured sole pattern and heel construction' },
+      { pattern: /zipper|buckle|clasp|lock/, detail: 'Close-up on the hardware — zipper, clasp, and metal details' },
+      { pattern: /logo|brand|label/, detail: 'Close-up on the brand logo and label, crisp and centered' },
+      { pattern: /crystal|gem|stone|diamond/, detail: 'Close-up on the gemstone settings catching and refracting light' },
+      { pattern: /print|pattern|graphic/, detail: 'Close-up on the printed pattern and color accuracy' },
+      { pattern: /button|bow|ribbon/, detail: 'Close-up on the button detailing and bow embellishments' },
+    ];
+    const detailEntry = detailMap.find(e => e.pattern.test(text));
+    const detailCloseup = detailEntry?.detail ?? 'Close-up on the surface texture, material quality, and product finishing';
+
+    // --- Style: cinematic quality descriptor ---
+    const styleMap: Array<{ pattern: RegExp; style: string }> = [
+      { pattern: /silk|áo|dress|traditional|hanbok|kimono/, style: 'Warm cinematic lighting, high-quality fashion photography, 4K' },
+      { pattern: /sport|gym|fitness|running/, style: 'Dynamic natural lighting, commercial sports photography, 4K' },
+      { pattern: /skincare|beauty|makeup/, style: 'Soft diffused lighting, premium beauty campaign style, 4K' },
+      { pattern: /perfume|fragrance/, style: 'Dramatic luxury lighting, high-end fragrance advertisement style, 4K' },
+      { pattern: /tech|phone|laptop|keyboard/, style: 'Clean modern lighting, premium tech product photography, 4K' },
+      { pattern: /jewelry|watch|ring|bracelet/, style: 'Dramatic spotlight, luxury jewelry advertisement style, 4K' },
+    ];
+    const styleEntry = styleMap.find(e => e.pattern.test(text));
+    const style = styleEntry?.style ?? 'Warm cinematic lighting, high-quality commercial product photography, 4K';
+
+    return { subject, primaryAction, secondaryAction, environment, materialBehavior, detailCloseup, style };
   }
 
   private extractProductDetail(title: string, description: string): {
@@ -238,25 +343,7 @@ export class VideoService implements OnModuleInit {
     { label: 'Tools & Hardware', pattern: /drill|hammer|wrench|screwdriver|tape measure|toolbox|plier|saw|level|nail gun/, bodyParts: 'hands and forearms gripping the tool', wrongBodyParts: 'face shown, feet, legs, tool not in use', action: 'using the tool on a real surface — drilling, tightening, or measuring — showing precision', environment: 'workshop or home repair setting with natural light', cameraShot: 'close-up on hands and tool in action, focused on the task' },
   ];
 
-  private inferPracticalUse(title: string, description: string): { action: string; bodyParts: string; wrongBodyParts: string; environment: string; cameraShot: string } {
-    const text = `${title} ${description}`.toLowerCase();
-
-    for (const cat of VideoService.CATEGORIES) {
-      if (cat.pattern.test(text)) {
-        return { bodyParts: cat.bodyParts, wrongBodyParts: cat.wrongBodyParts, action: cat.action, environment: cat.environment, cameraShot: cat.cameraShot };
-      }
-    }
-
-    return {
-      bodyParts: 'hands and the relevant body parts needed to use this product',
-      wrongBodyParts: 'face shown, incorrect body parts unrelated to product use',
-      action: 'picking up the product, using it for its intended purpose, and showcasing its value',
-      environment: 'natural lifestyle setting with soft daylight',
-      cameraShot: 'medium close-up on hands and product together',
-    };
-  }
-
-  private buildPromptFromProduct(product: { title: string; description: string; price: string }): string {
+private buildPromptFromProduct(product: { title: string; description: string; price: string }): string {
     return [
       `A short TikTok-style product advertisement for "${product.title}".`,
       product.description ? `Product details: ${product.description}.` : '',
